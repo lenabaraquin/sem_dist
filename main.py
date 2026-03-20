@@ -116,22 +116,33 @@ def find_knn(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Calcule la matrice terme-terme pour un corpus donné"
+        description="Calcule les k plus proches voisins d'un mot cible dans un espace d'embeddings étant donné le chemin vers un corpus et une taille de fenêtre."
     )
 
     parser.add_argument(
         "corpus_path", help="Chemin vers le corpus (un seul fichier attendu)."
     )
+    parser.add_argument(
+        "-w", "--window_size", type=int, help="Taille de la fenêtre contextuelle."
+    )
+    parser.add_argument(
+        "-k",
+        "--key_lemma",
+        type=str,
+        help="Lemme cible, à partir duquel sont calculées les similarité cosinus avec tous les autres lemmes du corpus.",
+    )
 
     args = parser.parse_args()
 
     corpus_path = args.corpus_path
+    window_size = args.window_size
+    key_lemma = args.key_lemma
 
     corpus = load_corpus(corpus_path)
 
-    ppmi_matrix, vocab_index = build_ppmi_matrix(corpus, 2)
+    ppmi_matrix, vocab_index = build_ppmi_matrix(corpus, window_size)
 
-    knn = find_knn("campagne", ppmi_matrix, vocab_index, 10)
+    knn = find_knn(key_lemma, ppmi_matrix, vocab_index, 10)
 
     __import__("pprint").pprint(knn)
 
