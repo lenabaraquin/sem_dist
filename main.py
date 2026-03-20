@@ -1,7 +1,8 @@
 import numpy as np
+import argparse
 
 
-def build_ppmi_matrix(corpus, window_size=2):
+def build_ppmi_matrix(corpus: list, window_size: int = 2):
     vocab = list(set(corpus))
     vocab_index = {w: i for i, w in enumerate(vocab)}
     V = len(vocab)
@@ -40,9 +41,29 @@ def build_ppmi_matrix(corpus, window_size=2):
     return PPMI, vocab_index
 
 
+def load_corpus(corpus_path: str) -> list:
+    with open(corpus_path, "r") as f:
+        corpus = f.read()
+    return corpus.split()
+
+
 def main():
-    corpus = "a b a b c".split()
+    parser = argparse.ArgumentParser(
+        description="Calcule la matrice terme-terme pour un corpus donné"
+    )
+
+    parser.add_argument(
+        "corpus_path", help="Chemin vers le corpus (un seul fichier attendu)."
+    )
+
+    args = parser.parse_args()
+
+    corpus_path = args.corpus_path
+
+    corpus = load_corpus(corpus_path)
+
     ppmi_matrix, vocab_index = build_ppmi_matrix(corpus, 2)
+
     __import__("pprint").pprint(ppmi_matrix)
     print(vocab_index)
 
