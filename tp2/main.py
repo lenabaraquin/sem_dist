@@ -28,7 +28,7 @@ def tokenize_corpus(corpus_str: str) -> list[str]:
 
 
 #####################################
-### Calcul des plongements ###
+### Calcul de la matrice des ppmi ###
 #####################################
 
 

@@ -1,22 +1,4 @@
-# TP 2 Sémantique distributionnelle
+# TP 3 Sémantique distributionnelle
 
-Code pour le TP 2
-
-## Lancer avec uv
-
-```
-uv run main.py <chemin_corpus> -w <taille_fenetre> -k <lemme_cible>
-```
-## Lancer l'interpreteur ipython
-
-```
-uv run \
-  --with ipython \
-  --with spacy \
-  --with https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.7.0/fr_core_news_sm-3.7.0-py3-none-any.whl \
-  ipython
-```
-
-## À faire
-
-Les fonctions de lissage ne sont pas encore implémentées.
+## Consignes : Correction des biais
+Énoncé volontairement très ouvert. A partir d'un corpus assez grand, il s'agit de calculer des représentations distributionnelles de type GloVe, puis de chercher des cas de biais avec la méthode analogique (roi-homme+femme=?). Dans un second temps, en modifiant le corpus de départ (par exemple en supprimant les occurrences les plus biaisées, ou en ajoutant des phrases pour contrebalancer les biais), on vérifie en construisant une nouvelle matrice GloVe que le biais est impacté par le corpus d'apprentissage.
