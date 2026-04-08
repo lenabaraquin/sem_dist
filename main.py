@@ -1,88 +1,41 @@
 import numpy as np
 import argparse
-import spacy
 
-nlp = spacy.load("fr_core_news_sm")
-
-############################
-### Chargement du corpus ###
-############################
+###############################
+### Chargement des vecteurs ###
+###############################
 
 
-def load_corpus(corpus_path: str) -> list[str]:
+def load_vectors(path: str, dimensions: int = 50) -> dict[str, tuple[np.ndarray]]:
     """
-    Charge un corpus dans une liste de lemmes étant donné le chemin vers un fichier texte.
+    Charge un dictionnaire de vecteurs étant donné le chemin vers un fichier texte.
     """
-    with open(corpus_path, "r") as f:
-        corpus = f.read()
-    return tokenize_corpus(corpus)
+    output = dict()
+    with open(path, "r") as f:
+        vectors_file_content = f.readlines()
+    for i, vector in enumerate(vectors_file_content):
+        vector_list = vector.split()
+        if len(vector_list) == dimensions + 1:
+            token, embedding = (
+                vector_list[0],
+                np.array([float(coord) for coord in vector_list[1:]]),
+            )
+            output[token] = embedding
 
+        else:
+            raise ValueError(
+                f"Line {i + 1}: expected {dimensions} dimensions, got {len(vector_list) - 1}"
+            )
 
-def tokenize_corpus(corpus_str: str) -> list[str]:
-    """
-    Retourne la liste des tokens lemmatisés du corpus.
-    """
-    document = nlp(corpus_str)
-    corpus = [token.lemma_ for token in document]
-    return corpus
+    return output
 
-
-#####################################
-### Calcul des plongements ###
-#####################################
-
-
-def build_ppmi_matrix(corpus: list[str], window_size: int = 2):
-    vocab = list(set(corpus))
-    vocab_index = {w: i for i, w in enumerate(vocab)}
-    V = len(vocab)
-
-    # matrice de cooccurrence
-    M = np.zeros((V, V))
-
-    for i, token in enumerate(corpus):
-        start = max(0, i - window_size)
-        end = min(len(corpus), i + window_size + 1)
-
-        for j in range(start, end):
-            if i != j:
-                context = corpus[j]
-                M[vocab_index[token], vocab_index[context]] += 1
-
-    # calcul PPMI
-    total = np.sum(M)
-    row_sum = np.sum(M, axis=1)
-    col_sum = np.sum(M, axis=0)
-
-    PPMI = np.zeros_like(M)
-
-    for i in range(V):
-        for j in range(V):
-            if M[i, j] == 0:
-                continue
-
-            p_ij = M[i, j] / total
-            p_i = row_sum[i] / total
-            p_j = col_sum[j] / total
-
-            pmi = np.log2(p_ij / (p_i * p_j))
-            PPMI[i, j] = max(0, pmi)
-
-    return PPMI, vocab_index
-
-
-##############################
-### Lissage des embeddings ###
-##############################
-
-pass
 
 ##########################
 ### Similarité cosinus ###
 ##########################
 
 
-def cosine_sim(u: np.array, v: np.array) -> np.float64:
+def cosine_sim(u: np.ndarray, v: np.ndarray) -> np.float64:
     """
     Calcule la similarité cosinus entre deux vecteurs.
     """
@@ -96,16 +49,17 @@ def cosine_sim(u: np.array, v: np.array) -> np.float64:
 
 
 def find_knn(
-    key_lemma: str, ppmi_matrix: np.array, vocab_index: dict[str, int], k: int = 10
+    key_vector: np.ndarray,
+    vectors_dict: dict[str, np.ndarray],
+    k: int = 10,
 ) -> list[str]:
     """
     C'est cracra mais retourne la liste des k lemmes les plus proches du lemme cible dans l'espace des plongements.
     """
-    key_ppmi = ppmi_matrix[vocab_index[key_lemma]]
     sim_dict = dict()
-    for lemma, index in vocab_index.items():
-        similarity = cosine_sim(key_ppmi, ppmi_matrix[index])
-        sim_dict[lemma] = similarity
+    for token, vector in vectors_dict.items():
+        similarity = cosine_sim(key_vector, vector)
+        sim_dict[token] = similarity
 
     knn = [
         lemma
@@ -114,38 +68,63 @@ def find_knn(
     return knn[:k]
 
 
+def find_knn_analogy(
+    key_token: str, token_1: str, token_2: str, vectors_dict: dict[str, np.ndarray]
+) -> list[str]:
+    if key_token not in vectors_dict:
+        raise Exception("Bad token (key_token), not in vocabulary")
+    if token_1 not in vectors_dict:
+        raise Exception("Bad token (token_1), not in vocabulary")
+    if token_2 not in vectors_dict:
+        raise Exception("Bad token (token_2), not in vocabulary")
+    key_vector = vectors_dict[key_token]
+    vector_1 = vectors_dict[token_1]
+    vector_2 = vectors_dict[token_2]
+    result_vector = key_vector - vector_1 + vector_2
+    return find_knn(result_vector, vectors_dict)
+
+
+def _help():
+    print("""
+     ├╴x  vectors_dict: dict[str, ndarray]
+     ├╴󰊕  load_vectors load_vectors(path: str, dimensions: int = 50) -> dict[str, tuple[np.ndarray]]: [8, 5]
+     ├╴󰊕  cosine_sim cosine_sim(u: np.ndarray, v: np.ndarray) -> np.float64: [37, 5]
+     ├╴󰊕  find_knn find_knn( [50, 5]
+     ├╴󰊕  find_knn_analogy find_knn_analogy( [70, 5]
+     ├╴󰊕  _help _help(): [86, 5]
+          """)
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Calcule les k plus proches voisins d'un mot cible dans un espace d'embeddings étant donné le chemin vers un corpus et une taille de fenêtre."
+        description="Calcule les 10 tokens les plus proches de key_token - token_a + token b.\nPar exemple, pour `main.py roi -a homme -b femme` on attend `reine` parmi les résultats retournés."
     )
 
+    parser.add_argument("key_token", help="Token cible.")
+    parser.add_argument("-a", help="Token_a.")
+    parser.add_argument("-b", help="Token_b.")
     parser.add_argument(
-        "corpus_path", help="Chemin vers le corpus (un seul fichier attendu)."
-    )
-    parser.add_argument(
-        "-w", "--window_size", type=int, help="Taille de la fenêtre contextuelle."
-    )
-    parser.add_argument(
-        "-k",
-        "--key_lemma",
-        type=str,
-        help="Lemme cible, à partir duquel sont calculées les similarité cosinus avec tous les autres lemmes du corpus.",
+        "--vectors",
+        required=False,
+        default="vectors.txt",
+        help="Chemin vers le fichier contenant les vecteurs.",
     )
 
     args = parser.parse_args()
 
-    corpus_path = args.corpus_path
-    window_size = args.window_size
-    key_lemma = args.key_lemma
+    path = args.vectors
+    key_token = args.key_token
+    token_a = args.a
+    token_b = args.b
+    vectors_dict: dict = load_vectors(path)
+    knn_analogy = find_knn_analogy(key_token, token_a, token_b, vectors_dict)
+    print(knn_analogy)
 
-    corpus = load_corpus(corpus_path)
 
-    ppmi_matrix, vocab_index = build_ppmi_matrix(corpus, window_size)
-
-    knn = find_knn(key_lemma, ppmi_matrix, vocab_index, 10)
-
-    __import__("pprint").pprint(knn)
-
+if __name__ != "__main__":
+    path = "vectors.txt"
+    vectors_dict: dict = load_vectors(path)
+    _help()
 
 if __name__ == "__main__":
     main()
